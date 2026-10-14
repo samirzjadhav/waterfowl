@@ -1,0 +1,139 @@
+/**
+ * Saved look of the app: font, size, and zoom.
+ * Stored in the local SQLite database so it survives a restart.
+ */
+
+import { getDatabase } from "./database";
+
+export const FONT_OPTIONS = [
+  {
+    id: "inter",
+    label: "Inter",
+    stack: '"Inter", system-ui, -apple-system, sans-serif',
+  },
+  {
+    id: "segoe",
+    label: "Segoe UI",
+    stack: '"Segoe UI", system-ui, sans-serif',
+  },
+  {
+    id: "system",
+    label: "System UI",
+    stack: "system-ui, -apple-system, sans-serif",
+  },
+  {
+    id: "jetbrains",
+    label: "JetBrains Mono",
+    stack: '"JetBrains Mono", "Fira Code", ui-monospace, monospace',
+  },
+  {
+    id: "consolas",
+    label: "Consolas",
+    stack: "Consolas, ui-monospace, monospace",
+  },
+] as const;
+
+export type FontFamilyId = (typeof FONT_OPTIONS)[number]["id"];
+
+export interface AppearanceSettings {
+  fontFamily: FontFamilyId;
+  fontSizePx: number;
+  zoomPercent: number;
+}
+
+export const DEFAULT_APPEARANCE: AppearanceSettings = {
+  fontFamily: "inter",
+  fontSizePx: 16,
+  zoomPercent: 100,
+};
+
+const FONT_SIZE_MIN = 12;
+const FONT_SIZE_MAX = 18;
+const ZOOM_MIN = 80;
+const ZOOM_MAX = 150;
+
+const KEYS = {
+  fontFamily: "fontFamily",
+  fontSizePx: "fontSizePx",
+  zoomPercent: "zoomPercent",
+} as const;
+
+function isFontFamilyId(value: string): value is FontFamilyId {
+  return FONT_OPTIONS.some((option) => option.id === value);
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+export function fontStackFor(id: FontFamilyId): string {
+  const option = FONT_OPTIONS.find((item) => item.id === id);
+  return option?.stack ?? FONT_OPTIONS[0].stack;
+}
+
+/** Write the saved look onto the page so every rem size and the font update together. */
+export function applyAppearance(settings: AppearanceSettings): void {
+  const root = document.documentElement;
+  root.style.setProperty("--font-sans", fontStackFor(settings.fontFamily));
+  root.style.fontSize = `${settings.fontSizePx}px`;
+  root.style.setProperty("zoom", `${settings.zoomPercent}%`);
+}
+
+function normalize(raw: Partial<Record<string, string>>): AppearanceSettings {
+  const fontFamily =
+    raw.fontFamily && isFontFamilyId(raw.fontFamily)
+      ? raw.fontFamily
+      : DEFAULT_APPEARANCE.fontFamily;
+
+  const fontSize = Number(raw.fontSizePx);
+  const zoom = Number(raw.zoomPercent);
+
+  return {
+    fontFamily,
+    fontSizePx: Number.isFinite(fontSize)
+      ? clamp(fontSize, FONT_SIZE_MIN, FONT_SIZE_MAX)
+      : DEFAULT_APPEARANCE.fontSizePx,
+    zoomPercent: Number.isFinite(zoom)
+      ? clamp(zoom, ZOOM_MIN, ZOOM_MAX)
+      : DEFAULT_APPEARANCE.zoomPercent,
+  };
+}
+
+export async function getAppearance(): Promise<AppearanceSettings> {
+  const database = await getDatabase();
+  const rows = await database.select<{ key: string; value: string }[]>(
+    "SELECT key, value FROM app_settings WHERE key IN (?, ?, ?)",
+    [KEYS.fontFamily, KEYS.fontSizePx, KEYS.zoomPercent],
+  );
+
+  const raw: Partial<Record<string, string>> = {};
+  for (const row of rows) {
+    raw[row.key] = row.value;
+  }
+  return normalize(raw);
+}
+
+export async function saveAppearance(
+  settings: AppearanceSettings,
+): Promise<void> {
+  const safe = normalize({
+    fontFamily: settings.fontFamily,
+    fontSizePx: String(settings.fontSizePx),
+    zoomPercent: String(settings.zoomPercent),
+  });
+
+  const database = await getDatabase();
+  const pairs: [string, string][] = [
+    [KEYS.fontFamily, safe.fontFamily],
+    [KEYS.fontSizePx, String(safe.fontSizePx)],
+    [KEYS.zoomPercent, String(safe.zoomPercent)],
+  ];
+
+  for (const [key, value] of pairs) {
+    await database.execute(
+      `INSERT INTO app_settings (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      [key, value],
+    );
+  }
+}

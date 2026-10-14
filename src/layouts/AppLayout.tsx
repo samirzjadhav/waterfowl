@@ -137,10 +137,16 @@ export function AppLayout() {
         </nav>
 
         <div className={styles.footer}>
-          <button className={styles.navItem} title="Settings">
+          <NavLink
+            to="/settings"
+            className={({ isActive }) =>
+              clsx(styles.navItem, isActive && styles.active)
+            }
+            title="Settings"
+          >
             <Settings size={16} />
             {!isCollapsed && <span>Settings</span>}
-          </button>
+          </NavLink>
           {!isCollapsed && <div className={styles.version}>v0.2.0</div>}
         </div>
       </aside>

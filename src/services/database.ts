@@ -85,4 +85,13 @@ const MIGRATIONS = [
       );
     `,
   },
+  {
+    name: "002_app_settings",
+    sql: `
+      CREATE TABLE IF NOT EXISTS app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+    `,
+  },
 ];
