@@ -7,49 +7,14 @@ import { getDatabase } from "./database";
 
 export const FONT_OPTIONS = [
   {
-    id: "segoe",
-    label: "Segoe UI",
-    stack: '"Segoe UI", sans-serif',
-  },
-  {
-    id: "arial",
-    label: "Arial",
-    stack: "Arial, sans-serif",
-  },
-  {
-    id: "georgia",
-    label: "Georgia",
-    stack: "Georgia, serif",
-  },
-  {
-    id: "times",
-    label: "Times New Roman",
-    stack: '"Times New Roman", serif',
-  },
-  {
-    id: "consolas",
-    label: "Consolas",
-    stack: "Consolas, monospace",
-  },
-  {
-    id: "courier",
-    label: "Courier New",
-    stack: '"Courier New", monospace',
-  },
-  {
     id: "inter",
     label: "Inter",
-    stack: '"Inter", "Segoe UI", sans-serif',
-  },
-  {
-    id: "system",
-    label: "System UI",
-    stack: "system-ui, sans-serif",
+    stack: '"Inter", system-ui, -apple-system, sans-serif',
   },
   {
     id: "jetbrains",
     label: "JetBrains Mono",
-    stack: '"JetBrains Mono", Consolas, monospace',
+    stack: '"JetBrains Mono", "Fira Code", monospace',
   },
 ] as const;
 
@@ -62,7 +27,7 @@ export interface AppearanceSettings {
 }
 
 export const DEFAULT_APPEARANCE: AppearanceSettings = {
-  fontFamily: "segoe",
+  fontFamily: "inter",
   fontSizePx: 16,
   zoomPercent: 100,
 };
