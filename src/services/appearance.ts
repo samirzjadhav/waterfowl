@@ -7,29 +7,49 @@ import { getDatabase } from "./database";
 
 export const FONT_OPTIONS = [
   {
-    id: "inter",
-    label: "Inter",
-    stack: '"Inter", system-ui, -apple-system, sans-serif',
-  },
-  {
     id: "segoe",
     label: "Segoe UI",
-    stack: '"Segoe UI", system-ui, sans-serif',
+    stack: '"Segoe UI", sans-serif',
   },
   {
-    id: "system",
-    label: "System UI",
-    stack: "system-ui, -apple-system, sans-serif",
+    id: "arial",
+    label: "Arial",
+    stack: "Arial, sans-serif",
   },
   {
-    id: "jetbrains",
-    label: "JetBrains Mono",
-    stack: '"JetBrains Mono", "Fira Code", ui-monospace, monospace',
+    id: "georgia",
+    label: "Georgia",
+    stack: "Georgia, serif",
+  },
+  {
+    id: "times",
+    label: "Times New Roman",
+    stack: '"Times New Roman", serif',
   },
   {
     id: "consolas",
     label: "Consolas",
-    stack: "Consolas, ui-monospace, monospace",
+    stack: "Consolas, monospace",
+  },
+  {
+    id: "courier",
+    label: "Courier New",
+    stack: '"Courier New", monospace',
+  },
+  {
+    id: "inter",
+    label: "Inter",
+    stack: '"Inter", "Segoe UI", sans-serif',
+  },
+  {
+    id: "system",
+    label: "System UI",
+    stack: "system-ui, sans-serif",
+  },
+  {
+    id: "jetbrains",
+    label: "JetBrains Mono",
+    stack: '"JetBrains Mono", Consolas, monospace',
   },
 ] as const;
 
@@ -42,7 +62,7 @@ export interface AppearanceSettings {
 }
 
 export const DEFAULT_APPEARANCE: AppearanceSettings = {
-  fontFamily: "inter",
+  fontFamily: "segoe",
   fontSizePx: 16,
   zoomPercent: 100,
 };
@@ -71,12 +91,17 @@ export function fontStackFor(id: FontFamilyId): string {
   return option?.stack ?? FONT_OPTIONS[0].stack;
 }
 
-/** Write the saved look onto the page so every rem size and the font update together. */
+/** Write the saved look onto the page so the whole window scales together. */
 export function applyAppearance(settings: AppearanceSettings): void {
   const root = document.documentElement;
-  root.style.setProperty("--font-sans", fontStackFor(settings.fontFamily));
+  const font = fontStackFor(settings.fontFamily);
+  root.style.setProperty("--font-sans", font);
+  root.style.setProperty("--font-mono", font);
+  root.style.setProperty("--app-font", font);
+  root.style.fontFamily = font;
   root.style.fontSize = `${settings.fontSizePx}px`;
-  root.style.setProperty("zoom", `${settings.zoomPercent}%`);
+  root.style.removeProperty("zoom");
+  root.style.setProperty("--app-zoom", String(settings.zoomPercent / 100));
 }
 
 function normalize(raw: Partial<Record<string, string>>): AppearanceSettings {

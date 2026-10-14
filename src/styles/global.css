@@ -21,18 +21,31 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* App-like feel */
 }
 
 #root {
-  flex: 1;
+  flex: none;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  width: calc(100vw / var(--app-zoom, 1));
+  height: calc(100vh / var(--app-zoom, 1));
+  transform: scale(var(--app-zoom, 1));
+  transform-origin: top left;
+  font-family: var(--app-font, var(--font-sans));
+}
+
+#root * {
+  font-family: var(--app-font, var(--font-sans)) !important;
 }
 
 a {

@@ -42,16 +42,6 @@
   background: var(--color-base-50);
 }
 
-.navLabel {
-  margin: 0 0 var(--space-2);
-  padding: 0 var(--space-3);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-text-tertiary);
-}
-
 .navItem {
   display: flex;
   align-items: center;
@@ -78,23 +68,6 @@
   background: var(--color-base-100);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-}
-
-.panelHeader {
-  padding: var(--space-4) var(--space-6);
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.panelTitle {
-  margin: 0;
-  font-size: var(--text-base);
-  font-weight: var(--weight-medium);
-}
-
-.panelHint {
-  margin: var(--space-1) 0 0;
-  font-size: var(--text-xs);
-  color: var(--color-text-secondary);
 }
 
 .row {

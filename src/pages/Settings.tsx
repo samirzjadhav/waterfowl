@@ -106,22 +106,14 @@ export function Settings() {
 
       <div className={styles.body}>
         <nav className={styles.nav} aria-label="Settings sections">
-          <p className={styles.navLabel}>Appearance</p>
           <div className={styles.navItem} aria-current="page">
             <Palette size={16} />
-            <span>Theme</span>
+            <span>Appearance</span>
           </div>
         </nav>
 
         <section className={styles.content}>
           <div className={styles.panel}>
-            <div className={styles.panelHeader}>
-              <h2 className={styles.panelTitle}>Theme</h2>
-              <p className={styles.panelHint}>
-                Font, size, and zoom for the whole window.
-              </p>
-            </div>
-
             <div className={styles.row}>
               <div>
                 <h3 className={styles.rowTitle}>Font type</h3>
