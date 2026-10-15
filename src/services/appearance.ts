@@ -56,6 +56,16 @@ export function fontStackFor(id: FontFamilyId): string {
   return option?.stack ?? FONT_OPTIONS[0].stack;
 }
 
+const TEXT_SCALE: Record<string, number> = {
+  "--text-xs": 0.75,
+  "--text-sm": 0.875,
+  "--text-base": 1,
+  "--text-lg": 1.125,
+  "--text-xl": 1.25,
+  "--text-2xl": 1.5,
+  "--text-3xl": 2,
+};
+
 /** Write the saved look onto the page so the whole window scales together. */
 export function applyAppearance(settings: AppearanceSettings): void {
   const root = document.documentElement;
@@ -64,7 +74,12 @@ export function applyAppearance(settings: AppearanceSettings): void {
   root.style.setProperty("--font-mono", font);
   root.style.setProperty("--app-font", font);
   root.style.fontFamily = font;
-  root.style.fontSize = `${settings.fontSizePx}px`;
+  // Keep 1rem at 16px so icon boxes and spacing stay put.
+  root.style.fontSize = "16px";
+  const scale = settings.fontSizePx / 16;
+  for (const [token, size] of Object.entries(TEXT_SCALE)) {
+    root.style.setProperty(token, `${size * scale}rem`);
+  }
   root.style.removeProperty("zoom");
   root.style.setProperty("--app-zoom", String(settings.zoomPercent / 100));
 }
