@@ -1,11 +1,18 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Check, ChevronDown, Palette } from "lucide-react";
-import { FONT_OPTIONS } from "@services/appearance";
-import { useAppearance } from "@context/AppearanceContext";
+import {
+  DEFAULT_APPEARANCE,
+  FONT_OPTIONS,
+  FONT_SIZE_PX_OPTIONS,
+  ZOOM_PERCENT_OPTIONS,
+  commitAppearanceChange,
+  getAppearance,
+  getAppliedAppearance,
+  readCachedAppearance,
+  type AppearanceSettings,
+} from "@services/appearance";
+import { useToast } from "@context/ToastContext";
 import styles from "./Settings.module.css";
-
-const FONT_SIZES = [12, 13, 14, 15, 16, 17, 18];
-const ZOOMS = [80, 90, 100, 110, 120, 130, 140, 150];
 
 function SettingSelect<T extends string | number>({
   value,
@@ -91,7 +98,48 @@ function SettingSelect<T extends string | number>({
 }
 
 export function Settings() {
-  const { settings, updateSettings } = useAppearance();
+  const { error: toastError } = useToast();
+  const [settings, setSettings] = useState<AppearanceSettings>(
+    () => readCachedAppearance() ?? DEFAULT_APPEARANCE,
+  );
+  const userEditedRef = useRef(false);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    let cancelled = false;
+
+    getAppearance()
+      .then((saved) => {
+        if (cancelled || userEditedRef.current) return;
+        setSettings(saved);
+      })
+      .catch((error: unknown) => {
+        console.error("Failed to load appearance settings for form", error);
+      });
+
+    return () => {
+      cancelled = true;
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const updateSetting = useCallback(
+    async (patch: Partial<AppearanceSettings>) => {
+      userEditedRef.current = true;
+      const { next, saved } = commitAppearanceChange(patch);
+      setSettings(next);
+
+      const outcome = await saved;
+      if (!mountedRef.current || outcome !== "failed-rolled-back") return;
+
+      setSettings(getAppliedAppearance());
+      toastError(
+        "Could not save appearance settings. Your previous look was restored.",
+      );
+    },
+    [toastError],
+  );
 
   return (
     <div className={styles.page}>
@@ -99,7 +147,8 @@ export function Settings() {
         <div>
           <h1 className={styles.title}>Settings</h1>
           <p className={styles.subtitle}>
-            Appearance is saved on this computer and restored when the app opens.
+            Appearance is saved on this computer and restored when the app
+            opens.
           </p>
         </div>
       </header>
@@ -117,7 +166,9 @@ export function Settings() {
             <div className={styles.row}>
               <div>
                 <h3 className={styles.rowTitle}>Font type</h3>
-                <p className={styles.rowHint}>Typeface used for the app text.</p>
+                <p className={styles.rowHint}>
+                  Sans-serif UI text (tables and SQL stay monospace).
+                </p>
               </div>
               <SettingSelect
                 label="Font type"
@@ -127,7 +178,7 @@ export function Settings() {
                   label: option.label,
                 }))}
                 onChange={(fontFamily) => {
-                  void updateSettings({ fontFamily });
+                  void updateSetting({ fontFamily });
                 }}
               />
             </div>
@@ -136,18 +187,19 @@ export function Settings() {
               <div>
                 <h3 className={styles.rowTitle}>Font size</h3>
                 <p className={styles.rowHint}>
-                  Base text size. Other sizes scale with it.
+                  Scales text that uses design tokens. Fixed pixel sizes
+                  elsewhere stay unchanged.
                 </p>
               </div>
               <SettingSelect
                 label="Font size"
                 value={settings.fontSizePx}
-                options={FONT_SIZES.map((size) => ({
+                options={FONT_SIZE_PX_OPTIONS.map((size) => ({
                   value: size,
                   label: `${size}px`,
                 }))}
                 onChange={(fontSizePx) => {
-                  void updateSettings({ fontSizePx });
+                  void updateSetting({ fontSizePx });
                 }}
               />
             </div>
@@ -160,12 +212,12 @@ export function Settings() {
               <SettingSelect
                 label="Zoom"
                 value={settings.zoomPercent}
-                options={ZOOMS.map((zoom) => ({
+                options={ZOOM_PERCENT_OPTIONS.map((zoom) => ({
                   value: zoom,
                   label: `${zoom}%`,
                 }))}
                 onChange={(zoomPercent) => {
-                  void updateSettings({ zoomPercent });
+                  void updateSetting({ zoomPercent });
                 }}
               />
             </div>

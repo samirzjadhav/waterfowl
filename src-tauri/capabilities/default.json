@@ -13,6 +13,7 @@
     "sql:default",
     "sql:allow-execute",
     "dialog:default",
-    "dialog:allow-save"
+    "dialog:allow-save",
+    "core:webview:allow-set-webview-zoom"
   ]
 }

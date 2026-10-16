@@ -4,7 +4,7 @@ import { Welcome } from "./pages/Welcome";
 import { Settings } from "./pages/Settings";
 import { NewConnection } from "./pages/connection/new/NewConnection";
 import { ConnectionDetails } from "./pages/connection/details/ConnectionDetails";
-import { AppearanceProvider } from "./context/AppearanceContext";
+import { AppearanceBootstrap } from "./components/AppearanceBootstrap";
 import { ConnectionsProvider } from "./context/ConnectionsContext";
 import { ToastProvider } from "./context/ToastContext";
 import { NewConnectionModalProvider } from "./context/NewConnectionModalContext";
@@ -12,7 +12,7 @@ import { NewConnectionModalProvider } from "./context/NewConnectionModalContext"
 function App() {
   return (
     <ToastProvider>
-      <AppearanceProvider>
+      <AppearanceBootstrap>
         <ConnectionsProvider>
           <NewConnectionModalProvider>
             <BrowserRouter>
@@ -33,7 +33,7 @@ function App() {
             </BrowserRouter>
           </NewConnectionModalProvider>
         </ConnectionsProvider>
-      </AppearanceProvider>
+      </AppearanceBootstrap>
     </ToastProvider>
   );
 }

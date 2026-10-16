@@ -280,7 +280,7 @@
   cursor: pointer;
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   text-align: left;
   transition:
     background-color var(--transition-fast),

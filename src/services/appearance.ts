@@ -3,6 +3,7 @@
  * Stored in the local SQLite database so it survives a restart.
  */
 
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getDatabase } from "./database";
 
 export const FONT_OPTIONS = [
@@ -32,10 +33,22 @@ export const DEFAULT_APPEARANCE: AppearanceSettings = {
   zoomPercent: 100,
 };
 
-const FONT_SIZE_MIN = 12;
-const FONT_SIZE_MAX = 18;
-const ZOOM_MIN = 80;
-const ZOOM_MAX = 150;
+export const FONT_SIZE_MIN = 12;
+export const FONT_SIZE_MAX = 18;
+export const ZOOM_MIN = 80;
+export const ZOOM_MAX = 150;
+
+export const FONT_SIZE_PX_OPTIONS = Array.from(
+  { length: FONT_SIZE_MAX - FONT_SIZE_MIN + 1 },
+  (_, index) => FONT_SIZE_MIN + index,
+);
+
+export const ZOOM_PERCENT_OPTIONS = Array.from(
+  { length: (ZOOM_MAX - ZOOM_MIN) / 10 + 1 },
+  (_, index) => ZOOM_MIN + index * 10,
+);
+
+const CACHE_KEY = "waterfowl.appearance.v1";
 
 const KEYS = {
   fontFamily: "fontFamily",
@@ -43,11 +56,29 @@ const KEYS = {
   zoomPercent: "zoomPercent",
 } as const;
 
+let appearanceDirtySinceLoad = false;
+let applied: AppearanceSettings | null = null;
+let saveQueue: Promise<void> = Promise.resolve();
+let zoomQueue: Promise<void> = Promise.resolve();
+
+export type AppearanceSaveOutcome =
+  | "saved"
+  | "failed-rolled-back"
+  | "failed-superseded";
+
+export function markAppearanceDirty(): void {
+  appearanceDirtySinceLoad = true;
+}
+
+export function shouldApplyLoadedAppearance(): boolean {
+  return !appearanceDirtySinceLoad;
+}
+
 function isFontFamilyId(value: string): value is FontFamilyId {
   return FONT_OPTIONS.some((option) => option.id === value);
 }
 
-function clamp(value: number, min: number, max: number): number {
+export function clampNumber(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
@@ -66,42 +97,158 @@ const TEXT_SCALE: Record<string, number> = {
   "--text-3xl": 2,
 };
 
-/** Write the saved look onto the page so the whole window scales together. */
-export function applyAppearance(settings: AppearanceSettings): void {
-  const root = document.documentElement;
-  const font = fontStackFor(settings.fontFamily);
-  root.style.setProperty("--font-sans", font);
-  root.style.setProperty("--font-mono", font);
-  root.style.setProperty("--app-font", font);
-  root.style.fontFamily = font;
-  // Keep 1rem at 16px so icon boxes and spacing stay put.
-  root.style.fontSize = "16px";
-  const scale = settings.fontSizePx / 16;
-  for (const [token, size] of Object.entries(TEXT_SCALE)) {
-    root.style.setProperty(token, `${size * scale}rem`);
-  }
-  root.style.removeProperty("zoom");
-  root.style.setProperty("--app-zoom", String(settings.zoomPercent / 100));
+/** The look currently on screen. Startup, database load, and edits all update it. */
+export function getAppliedAppearance(): AppearanceSettings {
+  return applied ?? readCachedAppearance() ?? DEFAULT_APPEARANCE;
 }
 
-function normalize(raw: Partial<Record<string, string>>): AppearanceSettings {
+function enqueueZoom(zoomPercent: number): void {
+  const factor = zoomPercent / 100;
+  const job = zoomQueue.then(async () => {
+    try {
+      await getCurrentWebview().setZoom(factor);
+    } catch (error: unknown) {
+      console.error("Failed to set window zoom", error);
+    }
+  });
+  zoomQueue = job.then(
+    () => undefined,
+    () => undefined,
+  );
+}
+
+/** Write the saved look onto the page so the whole window scales together. */
+export function applyAppearance(settings: AppearanceSettings): void {
+  applied = settings;
+  if (typeof document !== "undefined") {
+    const root = document.documentElement;
+    const font = fontStackFor(settings.fontFamily);
+    root.style.setProperty("--font-sans", font);
+    root.style.fontFamily = font;
+    // Keep 1rem at 16px so icon boxes and spacing stay put.
+    root.style.fontSize = "16px";
+    const scale = settings.fontSizePx / 16;
+    for (const [token, size] of Object.entries(TEXT_SCALE)) {
+      root.style.setProperty(token, `${size * scale}rem`);
+    }
+  }
+  enqueueZoom(settings.zoomPercent);
+}
+
+function enqueueSave(
+  snapshot: AppearanceSettings,
+  restoreTo: AppearanceSettings,
+): Promise<AppearanceSaveOutcome> {
+  const job = saveQueue.then(async (): Promise<AppearanceSaveOutcome> => {
+    try {
+      await saveAppearance(snapshot);
+      return "saved";
+    } catch (error: unknown) {
+      console.error("Failed to save appearance settings", error);
+      if (applied === snapshot) {
+        applyAppearance(restoreTo);
+        writeCachedAppearance(restoreTo);
+        return "failed-rolled-back";
+      }
+      return "failed-superseded";
+    }
+  });
+  saveQueue = job.then(
+    () => undefined,
+    () => undefined,
+  );
+  return job;
+}
+
+/**
+ * Apply one settings change immediately, then save the full snapshot.
+ * Saves run one at a time so two edits cannot mix font, size, and zoom.
+ */
+export function commitAppearanceChange(patch: Partial<AppearanceSettings>): {
+  next: AppearanceSettings;
+  saved: Promise<AppearanceSaveOutcome>;
+} {
+  const base = applied ?? readCachedAppearance() ?? DEFAULT_APPEARANCE;
+  const next = mergeAppearanceSettings(base, patch);
+  markAppearanceDirty();
+  applyAppearance(next);
+  writeCachedAppearance(next);
+  return { next, saved: enqueueSave(next, base) };
+}
+
+export function normalizeAppearanceSettings(
+  raw: Partial<Record<string, string>>,
+): AppearanceSettings {
   const fontFamily =
     raw.fontFamily && isFontFamilyId(raw.fontFamily)
       ? raw.fontFamily
       : DEFAULT_APPEARANCE.fontFamily;
 
-  const fontSize = Number(raw.fontSizePx);
-  const zoom = Number(raw.zoomPercent);
-
   return {
     fontFamily,
-    fontSizePx: Number.isFinite(fontSize)
-      ? clamp(fontSize, FONT_SIZE_MIN, FONT_SIZE_MAX)
-      : DEFAULT_APPEARANCE.fontSizePx,
-    zoomPercent: Number.isFinite(zoom)
-      ? clamp(zoom, ZOOM_MIN, ZOOM_MAX)
-      : DEFAULT_APPEARANCE.zoomPercent,
+    fontSizePx: parseBoundedInt(
+      raw.fontSizePx,
+      FONT_SIZE_MIN,
+      FONT_SIZE_MAX,
+      DEFAULT_APPEARANCE.fontSizePx,
+    ),
+    zoomPercent: parseBoundedInt(
+      raw.zoomPercent,
+      ZOOM_MIN,
+      ZOOM_MAX,
+      DEFAULT_APPEARANCE.zoomPercent,
+    ),
   };
+}
+
+function parseBoundedInt(
+  raw: string | undefined,
+  min: number,
+  max: number,
+  fallback: number,
+): number {
+  if (raw === undefined || raw.trim() === "") {
+    return fallback;
+  }
+  const value = Number(raw);
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+  return clampNumber(value, min, max);
+}
+
+export function mergeAppearanceSettings(
+  base: AppearanceSettings,
+  patch: Partial<AppearanceSettings>,
+): AppearanceSettings {
+  return normalizeAppearanceSettings({
+    fontFamily: patch.fontFamily ?? base.fontFamily,
+    fontSizePx: String(patch.fontSizePx ?? base.fontSizePx),
+    zoomPercent: String(patch.zoomPercent ?? base.zoomPercent),
+  });
+}
+
+export function readCachedAppearance(): AppearanceSettings | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<AppearanceSettings>;
+    return normalizeAppearanceSettings({
+      fontFamily: String(parsed.fontFamily ?? ""),
+      fontSizePx: String(parsed.fontSizePx ?? ""),
+      zoomPercent: String(parsed.zoomPercent ?? ""),
+    });
+  } catch {
+    return null;
+  }
+}
+
+export function writeCachedAppearance(settings: AppearanceSettings): void {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(settings));
+  } catch (error: unknown) {
+    console.error("Failed to cache appearance settings", error);
+  }
 }
 
 export async function getAppearance(): Promise<AppearanceSettings> {
@@ -115,13 +262,13 @@ export async function getAppearance(): Promise<AppearanceSettings> {
   for (const row of rows) {
     raw[row.key] = row.value;
   }
-  return normalize(raw);
+  return normalizeAppearanceSettings(raw);
 }
 
 export async function saveAppearance(
   settings: AppearanceSettings,
 ): Promise<void> {
-  const safe = normalize({
+  const safe = normalizeAppearanceSettings({
     fontFamily: settings.fontFamily,
     fontSizePx: String(settings.fontSizePx),
     zoomPercent: String(settings.zoomPercent),

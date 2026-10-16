@@ -8,18 +8,27 @@ import Database from "@tauri-apps/plugin-sql";
 
 const DB_NAME = "sqlite:waterfowl.db";
 
-let db: Database | null = null;
+let opening: Promise<Database> | null = null;
 
 /**
  * Get the database instance, initializing if needed.
+ * Concurrent callers share one open so startup cannot migrate the file twice.
  */
-export async function getDatabase(): Promise<Database> {
-  if (!db) {
-    console.log("intializing db with migrations");
-    db = await Database.load(DB_NAME);
-    await runMigrations(db);
+export function getDatabase(): Promise<Database> {
+  if (!opening) {
+    opening = openDatabase().catch((error: unknown) => {
+      opening = null;
+      throw error;
+    });
   }
-  return db;
+  return opening;
+}
+
+async function openDatabase(): Promise<Database> {
+  console.log("intializing db with migrations");
+  const database = await Database.load(DB_NAME);
+  await runMigrations(database);
+  return database;
 }
 
 /**
