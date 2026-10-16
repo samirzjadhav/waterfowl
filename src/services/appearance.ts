@@ -87,15 +87,14 @@ export function fontStackFor(id: FontFamilyId): string {
   return option?.stack ?? FONT_OPTIONS[0].stack;
 }
 
-const TEXT_SCALE: Record<string, number> = {
-  "--text-xs": 0.75,
-  "--text-sm": 0.875,
-  "--text-base": 1,
-  "--text-lg": 1.125,
-  "--text-xl": 1.25,
-  "--text-2xl": 1.5,
-  "--text-3xl": 2,
-};
+const SCALED_TEXT_TOKENS = [
+  "--text-xs",
+  "--text-sm",
+  "--text-lg",
+  "--text-xl",
+  "--text-2xl",
+  "--text-3xl",
+] as const;
 
 /** The look currently on screen. Startup, database load, and edits all update it. */
 export function getAppliedAppearance(): AppearanceSettings {
@@ -127,9 +126,10 @@ export function applyAppearance(settings: AppearanceSettings): void {
     root.style.fontFamily = font;
     // Keep 1rem at 16px so icon boxes and spacing stay put.
     root.style.fontSize = "16px";
-    const scale = settings.fontSizePx / 16;
-    for (const [token, size] of Object.entries(TEXT_SCALE)) {
-      root.style.setProperty(token, `${size * scale}rem`);
+    // Sizes in design-tokens.css are calc() from --text-base.
+    root.style.setProperty("--text-base", `${settings.fontSizePx / 16}rem`);
+    for (const token of SCALED_TEXT_TOKENS) {
+      root.style.removeProperty(token);
     }
   }
   enqueueZoom(settings.zoomPercent);
@@ -275,17 +275,16 @@ export async function saveAppearance(
   });
 
   const database = await getDatabase();
-  const pairs: [string, string][] = [
-    [KEYS.fontFamily, safe.fontFamily],
-    [KEYS.fontSizePx, String(safe.fontSizePx)],
-    [KEYS.zoomPercent, String(safe.zoomPercent)],
-  ];
-
-  for (const [key, value] of pairs) {
-    await database.execute(
-      `INSERT INTO app_settings (key, value) VALUES (?, ?)
-       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-      [key, value],
-    );
-  }
+  await database.execute(
+    `INSERT INTO app_settings (key, value) VALUES (?, ?), (?, ?), (?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    [
+      KEYS.fontFamily,
+      safe.fontFamily,
+      KEYS.fontSizePx,
+      String(safe.fontSizePx),
+      KEYS.zoomPercent,
+      String(safe.zoomPercent),
+    ],
+  );
 }

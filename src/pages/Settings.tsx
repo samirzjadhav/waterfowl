@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { Check, ChevronDown, Palette } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   DEFAULT_APPEARANCE,
   FONT_OPTIONS,
@@ -25,75 +24,24 @@ function SettingSelect<T extends string | number>({
   onChange: (value: T) => void;
   label: string;
 }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const listId = useId();
-  const selected = options.find((option) => option.value === value);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const onPointerDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
-
   return (
-    <div className={styles.select} ref={rootRef}>
-      <button
-        type="button"
-        className={styles.selectTrigger}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-controls={listId}
-        aria-label={label}
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span>{selected?.label ?? String(value)}</span>
-        <ChevronDown
-          size={14}
-          className={styles.selectChevron}
-          data-open={open}
-        />
-      </button>
-      {open && (
-        <ul id={listId} className={styles.selectMenu} role="listbox">
-          {options.map((option) => {
-            const isSelected = option.value === value;
-            return (
-              <li key={String(option.value)} role="presentation">
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={isSelected}
-                  className={styles.selectOption}
-                  data-selected={isSelected}
-                  onClick={() => {
-                    onChange(option.value);
-                    setOpen(false);
-                  }}
-                >
-                  <span>{option.label}</span>
-                  {isSelected && <Check size={14} />}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </div>
+    <select
+      className={styles.select}
+      aria-label={label}
+      value={String(value)}
+      onChange={(event) => {
+        const match = options.find(
+          (option) => String(option.value) === event.target.value,
+        );
+        if (match) onChange(match.value);
+      }}
+    >
+      {options.map((option) => (
+        <option key={String(option.value)} value={String(option.value)}>
+          {option.label}
+        </option>
+      ))}
+    </select>
   );
 }
 
@@ -153,77 +101,68 @@ export function Settings() {
         </div>
       </header>
 
-      <div className={styles.body}>
-        <nav className={styles.nav} aria-label="Settings sections">
-          <div className={styles.navItem} aria-current="page">
-            <Palette size={16} />
-            <span>Appearance</span>
+      <section className={styles.content}>
+        <div className={styles.panel}>
+          <div className={styles.row}>
+            <div>
+              <h3 className={styles.rowTitle}>Font type</h3>
+              <p className={styles.rowHint}>
+                Font for UI text. Tables and SQL stay monospace.
+              </p>
+            </div>
+            <SettingSelect
+              label="Font type"
+              value={settings.fontFamily}
+              options={FONT_OPTIONS.map((option) => ({
+                value: option.id,
+                label: option.label,
+              }))}
+              onChange={(fontFamily) => {
+                void updateSetting({ fontFamily });
+              }}
+            />
           </div>
-        </nav>
 
-        <section className={styles.content}>
-          <div className={styles.panel}>
-            <div className={styles.row}>
-              <div>
-                <h3 className={styles.rowTitle}>Font type</h3>
-                <p className={styles.rowHint}>
-                  Sans-serif UI text (tables and SQL stay monospace).
-                </p>
-              </div>
-              <SettingSelect
-                label="Font type"
-                value={settings.fontFamily}
-                options={FONT_OPTIONS.map((option) => ({
-                  value: option.id,
-                  label: option.label,
-                }))}
-                onChange={(fontFamily) => {
-                  void updateSetting({ fontFamily });
-                }}
-              />
+          <div className={styles.row}>
+            <div>
+              <h3 className={styles.rowTitle}>Font size</h3>
+              <p className={styles.rowHint}>
+                Scales text that uses design tokens. Fixed pixel sizes elsewhere
+                stay unchanged.
+              </p>
             </div>
-
-            <div className={styles.row}>
-              <div>
-                <h3 className={styles.rowTitle}>Font size</h3>
-                <p className={styles.rowHint}>
-                  Scales text that uses design tokens. Fixed pixel sizes
-                  elsewhere stay unchanged.
-                </p>
-              </div>
-              <SettingSelect
-                label="Font size"
-                value={settings.fontSizePx}
-                options={FONT_SIZE_PX_OPTIONS.map((size) => ({
-                  value: size,
-                  label: `${size}px`,
-                }))}
-                onChange={(fontSizePx) => {
-                  void updateSetting({ fontSizePx });
-                }}
-              />
-            </div>
-
-            <div className={styles.row}>
-              <div>
-                <h3 className={styles.rowTitle}>Zoom</h3>
-                <p className={styles.rowHint}>Scale of the whole window.</p>
-              </div>
-              <SettingSelect
-                label="Zoom"
-                value={settings.zoomPercent}
-                options={ZOOM_PERCENT_OPTIONS.map((zoom) => ({
-                  value: zoom,
-                  label: `${zoom}%`,
-                }))}
-                onChange={(zoomPercent) => {
-                  void updateSetting({ zoomPercent });
-                }}
-              />
-            </div>
+            <SettingSelect
+              label="Font size"
+              value={settings.fontSizePx}
+              options={FONT_SIZE_PX_OPTIONS.map((size) => ({
+                value: size,
+                label: `${size}px`,
+              }))}
+              onChange={(fontSizePx) => {
+                void updateSetting({ fontSizePx });
+              }}
+            />
           </div>
-        </section>
-      </div>
+
+          <div className={styles.row}>
+            <div>
+              <h3 className={styles.rowTitle}>Zoom</h3>
+              <p className={styles.rowHint}>Scale of the whole window.</p>
+            </div>
+            <SettingSelect
+              label="Zoom"
+              value={settings.zoomPercent}
+              options={ZOOM_PERCENT_OPTIONS.map((zoom) => ({
+                value: zoom,
+                label: `${zoom}%`,
+              }))}
+              onChange={(zoomPercent) => {
+                void updateSetting({ zoomPercent });
+              }}
+            />
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

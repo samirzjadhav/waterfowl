@@ -100,19 +100,16 @@ describe("commitAppearanceChange", () => {
   });
 
   it("writes a second edit only after the first snapshot finishes", async () => {
-    const calls: { key: string; value: string }[] = [];
+    const calls: unknown[][] = [];
     let releaseFirstWrite = () => {};
     const firstWrite = new Promise<void>((resolve) => {
       releaseFirstWrite = resolve;
     });
     execute.mockImplementation(
       async (_query: string, bindValues?: unknown[]) => {
-        calls.push({
-          key: String(bindValues?.[0]),
-          value: String(bindValues?.[1]),
-        });
+        calls.push(bindValues ?? []);
         if (calls.length === 1) await firstWrite;
-        return { rowsAffected: 1 };
+        return { rowsAffected: 3 };
       },
     );
 
@@ -122,18 +119,16 @@ describe("commitAppearanceChange", () => {
     await vi.waitFor(() => {
       expect(execute).toHaveBeenCalledTimes(1);
     });
-    expect(calls).toEqual([{ key: "fontFamily", value: "jetbrains" }]);
+    expect(calls).toEqual([
+      ["fontFamily", "jetbrains", "fontSizePx", "16", "zoomPercent", "100"],
+    ]);
 
     releaseFirstWrite();
     await expect(first.saved).resolves.toBe("saved");
     await expect(second.saved).resolves.toBe("saved");
     expect(calls).toEqual([
-      { key: "fontFamily", value: "jetbrains" },
-      { key: "fontSizePx", value: "16" },
-      { key: "zoomPercent", value: "100" },
-      { key: "fontFamily", value: "jetbrains" },
-      { key: "fontSizePx", value: "14" },
-      { key: "zoomPercent", value: "100" },
+      ["fontFamily", "jetbrains", "fontSizePx", "16", "zoomPercent", "100"],
+      ["fontFamily", "jetbrains", "fontSizePx", "14", "zoomPercent", "100"],
     ]);
     expect(getAppliedAppearance()).toEqual({
       fontFamily: "jetbrains",
